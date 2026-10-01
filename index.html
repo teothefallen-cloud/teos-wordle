@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Teo's Infinite Wordle</title>
+    <!-- Icona personalizzata dell'app -->
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" href="icon.png">
+    <style>
+        :root {
+            --bg-color: #121213;
+            --text-color: #ffffff;
+            --border-color: #3a3a3c;
+            --tile-bg: #121213;
+            --key-bg: #818384;
+            --correct-bg: #538d4e;
+            --present-bg: #b59f3b;
+            --absent-bg: #3a3a3c;
+            --header-border: #3a3a3c;
+            --timer-bg: rgba(255, 255, 255, 0.08);
+            --timer-border: rgba(255, 255, 255, 0.15);
+        }
+
+        body.light-theme {
+            --bg-color: #ffffff;
+            --text-color: #1a1a1b;
+            --border-color: #d3d6da;
+            --tile-bg: #ffffff;
+            --key-bg: #d3d6da;
+            --correct-bg: #6aaa64;
+            --present-bg: #c9b458;
+            --absent-bg: #787c7e;
+            --header-border: #d3d6da;
+            --timer-bg: rgba(0, 0, 0, 0.05);
+            --timer-border: rgba(0, 0, 0, 0.1);
+        }
+
+        /* Modalità Daltonica (Alto Contrasto: Arancione e Azzurro) */
+        body.colorblind-theme {
+            --correct-bg: #f5793a; /* Arancione forte */
+            --present-bg: #85c0f9; /* Azzurro cielo */
+            --absent-bg: #3a3a3c;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+            width: 100%;
+            max-width: 500px;
+            border-bottom: 1px solid var(--header-border);
+            padding-bottom: 10px;
+            position: relative;
+        }
+        h1 {
+            font-size: 1.4rem;
+            letter-spacing: 1.5px;
+            margin-bottom: 5px;
+            color: var(--correct-bg);
+            margin-left: 75px; /* Spazio per evitare la sovrapposizione con le icone */
+            margin-right: 55px; /* Spazio per evitare la sovrapposizione con il timer */
+            white-space: nowrap;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            font-size: 0.9rem;
+            color: #818384;
+        }
+        
+        /* Controlli in alto (Icone Impostazioni / Aiuto) */
+        .top-icons {
+            position: absolute;
+            left: 0;
+            top: 0;
+            display: flex;
+            gap: 4px;
+        }
+        .icon-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            font-size: 0.95rem;
+            padding: 4px 6px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        #timer-box {
+            position: absolute;
+            right: 0;
+            top: 0;
+            background-color: var(--timer-bg);
+            border: 1px solid var(--timer-border);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--text-color);
+            font-weight: bold;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 20px;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+        }
+        .board-row {
+            display: flex;
+            gap: 6px;
+        }
+        .tile {
+            width: 45px;
+            height: 45px;
+            border: 2px solid var(--border-color);
+            background-color: var(--tile-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            user-select: none;
+            transition: transform 0.2s;
+        }
+        .tile.filled {
+            border-color: #565758;
+            animation: pop 0.1s ease-in-out;
+        }
+        .tile.correct { background-color: var(--correct-bg) !important; border-color: var(--correct-bg) !important; color: white; }
+        .tile.present { background-color: var(--present-bg) !important; border-color: var(--present-bg) !important; color: white; }
+        .tile.absent { background-color: var(--absent-bg) !important; border-color: var(--absent-bg) !important; color: white; }
+
+        @keyframes pop {
+            0% { transform: scale(0.8); }
+            100% { transform: scale(1); }
+        }
+
+        #keyboard {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+        .key {
+            background-color: var(--key-bg);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 0;
+            font-weight: bold;
+            flex-grow: 1;
+            cursor: pointer;
+            font-size: 0.9rem;
+            user-select: none;
+        }
+        .key.wide {
+            flex-grow: 1.5;
+            font-size: 0.8rem;
+        }
+        .key.correct { background-color: var(--correct-bg) !important; }
+        .key.present { background-color: var(--present-bg) !important; }
+        .key.absent { background-color: var(--absent-bg) !important; }
+
+        #message {
+            position: fixed;
+            top: 20px;
+            background-color: white;
+            color: black;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Finestre Modali (Popup Info e Impostazioni) */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 25px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 420px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content h2 { margin-bottom: 12px; }
+        .modal-content p { margin-bottom: 12px; font-size: 0.9rem; line-height: 1.4; text-align: left; }
+        .modal-content .center-text { text-align: center; }
+        .close-btn {
+            background-color: var(--correct-bg);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            font-size: 1rem;
+        }
+
+        /* Stile Toggle Switch (Levetta) */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #787c7e;
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--correct-bg);
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+        
+        /* Stili per le pillole colorate esplicative nelle istruzioni */
+        .pill-green {
+            background-color: #538d4e;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .pill-yellow {
+            background-color: #b59f3b;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .pill-gray {
+            background-color: #3a3a3c;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .dev-credit {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.85rem;
+            color: #818384;
+        }
+        .dev-credit a {
+            color: var(--correct-bg);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .dev-credit a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body class="dark-theme">
+
+    <div id="message">Messaggio</div>
+
+    <!-- Popup Istruzioni / Info & Crediti -->
+    <div id="info-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h2>TEO'S WORDLE 💻</h2>
+            <p class="center-text"><b>La sfida infinita delle parole!</b></p>
+            <p>• Indovina la parola segreta in 6 tentativi.<br>
+            • Vengono accettate solo parole realmente esistenti nel dizionario.<br>
+            • Ogni livello completato aumenta la difficoltà e la lunghezza delle parole (da 5 fino a 9 lettere!).</p>
+            
+            <p><b>Legenda dei colori:</b><br>
+            • Le lettere corrette e nella posizione giusta si colorano di <span class="pill-green">VERDE</span>.<br>
+            • Le lettere presenti nella parola ma nella posizione errata si colorano di <span class="pill-yellow">GIALLO</span>.<br>
+            • Le lettere che diventano scure (<span class="pill-gray">GRIGIE</span>) non sono presenti nella parola segreta.</p>
+
+            <div class="dev-credit">
+                <p class="center-text" style="margin-bottom: 5px;">Ispirato al celebre gioco Wordle, ma completamente in italiano, senza limiti di una sola parola al giorno e pronto a mettere alla prova le vere competenze dei giocatori!</p>
+                <p class="center-text" style="margin-bottom: 8px;"><b>Dedicato a lei che mi su(o)pporta ogni giorno 🤍</b></p>
+                <p class="center-text">Sviluppato in coding da Teo<br>
+                Seguimi su Instagram: <a href="https://www.instagram.com/matteoo.denino?stkn=MW8wNjF2azF6MzB2OA%3D%3D&utm_source=qr" target="_blank">@matteoo.denino</a></p>
+            </div>
+
+            <button class="close-btn" onclick="closeModal('info-modal')">GIOCA ORA</button>
+        </div>
+    </div>
+
+    <!-- Popup Impostazioni -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <h2>Impostazioni</h2>
+            <div class="setting-row">
+                <span>Tema Chiaro</span>
+                <label class="switch">
+                    <input type="checkbox" id="theme-switch" onchange="toggleTheme()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span>Modalità Daltonica</span>
+                <label class="switch">
+                    <input type="checkbox" id="colorblind-switch" onchange="toggleColorblind()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button class="close-btn" onclick="closeModal('settings-modal')">Chiudi</button>
+        </div>
+    </div>
+
+    <header>
+        <div class="top-icons">
+            <button class="icon-btn" onclick="openModal('info-modal')">❓</button>
+            <button class="icon-btn" onclick="openModal('settings-modal')">⚙️</button>
+        </div>
+        <div id="timer-box">⏱️ <span id="timer-display">0s</span></div>
+        <h1>TEO'S WORDLE</h1>
+        <div class="stats">
+            <span id="level-display">Livello: 1</span>
+            <span id="length-display">Lettere: 5</span>
+            <span id="score-display">Punti: 0</span>
+        </div>
+    </header>
+
+    <div id="game-container"></div>
+
+    <div id="keyboard">
+        <div class="keyboard-row">
+            <button class="key" data-key="Q">Q</button>
+            <button class="key" data-key="W">W</button>
+            <button class="key" data-key="E">E</button>
+            <button class="key" data-key="R">R</button>
+            <button class="key" data-key="T">T</button>
+            <button class="key" data-key="Y">Y</button>
+            <button class="key" data-key="U">U</button>
+            <button class="key" data-key="I">I</button>
+            <button class="key" data-key="O">O</button>
+            <button class="key" data-key="P">P</button>
+        </div>
+        <div class="keyboard-row">
+            <button class="key" data-key="A">A</button>
+            <button class="key" data-key="S">S</button>
+            <button class="key" data-key="D">D</button>
+            <button class="key" data-key="F">F</button>
+            <button class="key" data-key="G">G</button>
+            <button class="key" data-key="H">H</button>
+            <button class="key" data-key="J">J</button>
+            <button class="key" data-key="K">K</button>
+            <button class="key" data-key="L">L</button>
+        </div>
+        <div class="keyboard-row">
+            <button class="key wide" data-key="ENTER">INVIO</button>
+            <button class="key" data-key="Z">Z</button>
+            <button class="key" data-key="X">X</button>
+            <button class="key" data-key="C">C</button>
+            <button class="key" data-key="V">V</button>
+            <button class="key" data-key="B">B</button>
+            <button class="key" data-key="N">N</button>
+            <button class="key" data-key="M">M</button>
+            <button class="key wide" data-key="BACK">DEL</button>
+        </div>
+    </div>
+
+    <script>
+        const wordsDB = {
+            5: ["CUORE", "FORZA", "FOCUS", "MAGIA", "NOTTE", "MONDO", "VERDE", "FESTA", "AMORE", "PIANO", "TORRE", "RADIO", "SUONO", "VALCE", "PIACE", "VENTO", "STILE"],
+            6: ["CODICE", "GIOCHI", "FUTURO", "NUVOLA", "TEMPO", "STRADA", "PIAZZA", "PAURA", "LIBERO", "SABATO", "CINEMA", "PIATTO", "AMICO", "PIOGGIA", "FIORE"],
+            7: ["SILENZIO", "PASSIONE", "RAGAZZA", "SEGRETO", "FESTIVAL", "MATTINO", "GIARDINO", "FANTASIA", "STUDIO", "INSIEME"],
+            8: ["UNIVERSO", "COMPUTER", "STUDENTE", "SORRISO", "FAMIGLIA", "GIORNATA", "TELEFONO", "CAMPIONE", "LIBERTA", "PASSATO"],
+            9: ["ARCHITETTO", "SVILUPPO", "MERAVIGLIA", "SPETTACOLO", "EMOZIONE", "FUTURISTA", "FANTASTICO", "DIREZIONE"]
+        };
+
+        function getWordForLevel(lvl) {
+            let len = Math.min(5 + Math.floor((lvl - 1) / 5), 9);
+            let list = wordsDB[len];
+            let randomIndex = Math.floor(Math.random() * list.length);
+            return list[randomIndex];
+        }
+
+        // Caricamento dei progressi salvati (LocalStorage)
+        let currentLevel = localStorage.getItem('teo_wordle_level') ? parseInt(localStorage.getItem('teo_wordle_level')) : 1;
+        let score = localStorage.getItem('teo_wordle_score') ? parseInt(localStorage.getItem('teo_wordle_score')) : 0;
+        
+        let wordLength = 5;
+        let targetWord = "";
+        let currentRow = 0;
+        let currentCol = 0;
+        let boardState = [];
+        let isGameOver = false;
+        let startTime = 0;
+        let timerInterval = null;
+
+        const maxRows = 6;
+
+        // Gestione Finestre Modali
+        function openModal(id) { document.getElementById(id).style.display = "flex"; }
+        function closeModal(id) { document.getElementById(id).style.display = "none"; }
+
+        // Gestione Tema Chiaro/Scuro con Toggle
+        function toggleTheme() {
+            const isChecked = document.getElementById('theme-switch').checked;
+            if (isChecked) {
+                document.body.classList.remove('dark-theme');
+                document.body.classList.add('light-theme');
+            } else {
+                document.body.classList.remove('light-theme');
+                document.body.classList.add('dark-theme');
+            }
+        }
+
+        // Gestione Modalità Daltonica con Toggle
+        function toggleColorblind() {
+            document.body.classList.toggle('colorblind-theme');
+            let isChecked = document.getElementById('colorblind-switch').checked;
+            showMessage(isChecked ? "Modalità daltonica attivata!" : "Modalità daltonica disattivata!", 1000);
+        }
+
+        function saveProgress() {
+            localStorage.setItem('teo_wordle_level', currentLevel);
+            localStorage.setItem('teo_wordle_score', score);
+        }
+
+        function initGame() {
+            wordLength = Math.min(5 + Math.floor((currentLevel - 1) / 5), 9);
+            targetWord = getWordForLevel(currentLevel);
+            
+            if(targetWord.length !== wordLength) {
+                targetWord = targetWord.padEnd(wordLength, 'A');
+            }
+            
+            currentRow = 0;
+            currentCol = 0;
+            isGameOver = false;
+            boardState = Array(maxRows).fill().map(() => Array(wordLength).fill(''));
+            
+            startTime = Date.now();
+            startTimerDisplay();
+
+            document.getElementById("level-display").innerText = "Livello: " + currentLevel;
+            document.getElementById("length-display").innerText = "Lettere: " + wordLength;
+            document.getElementById("score-display").innerText = "Punti: " + score;
+
+            buildBoard();
+            resetKeyboardUI();
+            saveProgress();
+        }
+
+        function startTimerDisplay() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (isGameOver) return;
+                let elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+                document.getElementById("timer-display").innerText = elapsedSeconds + "s";
+            }, 500);
+        }
+
+        function buildBoard() {
+            const container = document.getElementById("game-container");
+            container.innerHTML = "";
+            for (let r = 0; r < maxRows; r++) {
+                const rowDiv = document.createElement("div");
+                rowDiv.className = "board-row";
+                for (let c = 0; c < wordLength; c++) {
+                    const tile = document.createElement("div");
+                    tile.className = "tile";
+                    tile.id = `tile-${r}-${c}`;
+                    rowDiv.appendChild(tile);
+                }
+                container.appendChild(rowDiv);
+            }
+        }
+
+        function showMessage(text, time = 1500) {
+            const msg = document.getElementById("message");
+            msg.innerText = text;
+            msg.style.display = "block";
+            setTimeout(() => {
+                msg.style.display = "none";
+            }, time);
+        }
+
+        document.querySelectorAll(".key").forEach(button => {
+            button.addEventListener("click", () => {
+                handleKey(button.getAttribute("data-key"));
+            });
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") handleKey("ENTER");
+            else if (e.key === "Backspace") handleKey("BACK");
+            else {
+                const key = e.key.toUpperCase();
+                if (/^[A-Z]$/.test(key)) handleKey(key);
+            }
+        });
+
+        function handleKey(key) {
+            if (isGameOver) return;
+
+            if (key === "ENTER") {
+                submitRow();
+            } else if (key === "BACK") {
+                if (currentCol > 0) {
+                    currentCol--;
+                    boardState[currentRow][currentCol] = '';
+                    updateTile(currentRow, currentCol, '');
+                }
+            } else {
+                if (currentCol < wordLength) {
+                    boardState[currentRow][currentCol] = key;
+                    updateTile(currentRow, currentCol, key);
+                    currentCol++;
+                }
+            }
+        }
+
+        function updateTile(row, col, letter) {
+            const tile = document.getElementById(`tile-${row}-${col}`);
+            tile.innerText = letter;
+            if (letter !== '') tile.classList.add("filled");
+            else tile.classList.remove("filled");
+        }
+
+        function submitRow() {
+            if (currentCol < wordLength) {
+                showMessage("Parola troppo corta!");
+                return;
+            }
+
+            let guess = boardState[currentRow].join("");
+            
+            // Controllo validità: la parola deve esistere nel database della sua lunghezza
+            if (!wordsDB[wordLength].includes(guess)) {
+                showMessage("Parola non presente nel dizionario!");
+                return;
+            }
+            
+            let targetChars = targetWord.split("");
+            let guessChars = guess.split("");
+            let rowStatuses = Array(wordLength).fill("absent");
+
+            for (let i = 0; i < wordLength; i++) {
+                if (guessChars[i] === targetChars[i]) {
+                    rowStatuses[i] = "correct";
+                    targetChars[i] = null;
+                    guessChars[i] = null;
+                }
+            }
+
+            for (let i = 0; i < wordLength; i++) {
+                if (guessChars[i] !== null) {
+                    let index = targetChars.indexOf(guessChars[i]);
+                    if (index !== -1) {
+                        rowStatuses[i] = "present";
+                        targetChars[index] = null;
+                    }
+                }
+            }
+
+            for (let i = 0; i < wordLength; i++) {
+                const tile = document.getElementById(`tile-${currentRow}-${i}`);
+                tile.classList.add(rowStatuses[i]);
+                updateKeyColor(guess[i], rowStatuses[i]);
+            }
+
+            if (guess === targetWord) {
+                isGameOver = true;
+                clearInterval(timerInterval);
+                score += (currentLevel * 10);
+                currentLevel++;
+                saveProgress();
+                
+                let timeSpent = Math.floor((Date.now() - startTime) / 1000);
+                showMessage(`Grande! Livello superato in ${timeSpent} secondi! 🚀`, 2500);
+                
+                setTimeout(() => {
+                    initGame();
+                }, 2500);
+                return;
+            }
+
+            currentRow++;
+            currentCol = 0;
+            if (currentRow === maxRows) {
+                isGameOver = true;
+                clearInterval(timerInterval);
+                showMessage(`Peccato! La parola era: ${targetWord}`, 4000);
+                setTimeout(() => {
+                    initGame();
+                }, 4000);
+            }
+        }
+
+        function updateKeyColor(letter, status) {
+            const keyBtn = document.querySelector(`.key[data-key="${letter}"]`);
+            if (!keyBtn) return;
+            if (keyBtn.classList.contains("correct")) return;
+            if (status === "correct") {
+                keyBtn.classList.remove("present", "absent");
+                keyBtn.classList.add("correct");
+            } else if (status === "present" && !keyBtn.classList.contains("correct")) {
+                keyBtn.classList.remove("absent");
+                keyBtn.classList.add("present");
+            } else if (status === "absent" && !keyBtn.classList.contains("correct") && !keyBtn.classList.contains("present")) {
+                keyBtn.classList.add("absent");
+            }
+        }
+
+        function resetKeyboardUI() {
+            document.querySelectorAll(".key").forEach(btn => {
+                btn.classList.remove("correct", "present", "absent");
+            });
+        }
+
+        initGame();
+    </script>
+</body>
+</html>
